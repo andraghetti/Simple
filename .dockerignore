@@ -1,0 +1,9 @@
+# Exclude folders that would be mounted
+fastq/
+runs/
+refs/
+
+# Exclude git and system files
+.git/
+.github/
+.DS_Store

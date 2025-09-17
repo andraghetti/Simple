@@ -5,6 +5,14 @@
 #define the path to Java java-1.8.0 version
 java='/usr/bin/java'
 
+#CPU cores configuration
+# Set to "auto" to use all available cores, or specify a number (e.g., 4)
+cpu_cores="auto"
+
+#Java memory allocation
+# Set the amount of RAM to allocate for Java tools (e.g., "4g", "8g", "16g", "32g")
+java_memory="32g"
+
 #input files
 mut_files=fastq/*mut*
 wt_files=fastq/*wt*
@@ -12,10 +20,8 @@ wt_files=fastq/*wt*
 #output names
 mutation=recessive #change to dominant if the mutation is dominant
 line=EMS  ##if you prefer, change EMS to the name of your line.  Letters and underscores only.
-mut=EMS_mut 
-wt=EMS_wt 
-
-
+mut=EMS_mut
+wt=EMS_wt
 
 my_species=Arabidopsis_thaliana #paste your species name here to replace Arabidopsis_thaliana
 

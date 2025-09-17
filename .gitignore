@@ -1,12 +1,7 @@
 .DS_Store
-/archive/*
-!/archive/empty.txt
 /fastq/*
-!/fastq/empty.txt
-/output/*
-!/output/empty.txt
+/runs/*
 #/programs/**
-#!/programs/empty.txt
 /refs/*
 !/refs/empty.vcf
 !/refs/empty.vcf.gz

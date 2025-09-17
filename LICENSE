@@ -1,0 +1,72 @@
+MIT License
+
+Copyright (c) 2025 Simple Pipeline
+Copyright (c) 2025 Lorenzo Andraghetti
+Copyright (c) 2017 Guy Wachsman
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+ORIGINAL SIMPLE PIPELINE
+
+This Dockerized version is based on the original Simple pipeline:
+- Original Author: Guy Wachsman
+- Original Repository: https://github.com/wacguy/Simple-1.8.1
+
+The original Simple pipeline was developed for mapping EMS-induced point mutations 
+using bulk segregant analysis. This Dockerized version maintains the same 
+scientific methodology while providing improved usability and reproducibility.
+
+---
+
+THIRD-PARTY SOFTWARE LICENSES
+
+This software includes third-party components with their respective licenses:
+
+BWA (Burrows-Wheeler Aligner) v0.7.19
+- License: GPL v3
+- Source: https://github.com/lh3/bwa
+- License URL: https://github.com/lh3/bwa/blob/master/COPYING
+
+samtools v1.22.1
+- License: MIT License
+- Source: https://github.com/samtools/samtools
+- License URL: https://github.com/samtools/samtools/blob/develop/LICENSE
+
+Picard v2.27.5
+- License: MIT License
+- Source: https://github.com/broadinstitute/picard
+- License URL: https://tldrlegal.com/license/mit-license
+
+GATK (Genome Analysis Toolkit) v3.7.0
+- License: BSD 3-Clause License
+- Source: https://github.com/broadgsa/gatk
+- License URL: https://software.broadinstitute.org/gatk/download/licensing
+- Note: Free for academic use, commercial license required
+
+snpEff v4.3p
+- License: LGPL v3
+- Source: http://snpeff.sourceforge.net/
+- License URL: https://pcingola.github.io/SnpEff/license/
+
+OpenJDK 8
+- License: GPL v2 with Classpath Exception
+- Source: https://openjdk.org/
+- License URL: https://openjdk.org/legal/gplv2+ce.html
