@@ -30,6 +30,10 @@ The pipeline automatically detects files based on flexible patterns. Files must 
 - **"R1"** or **"R2"** to indicate read direction
 - **Any extension**: `.fastq`, `.fq`, `.fastq.gz`, `.fq.gz`, etc.
 
+<details>
+
+<summary>Click here to know more about the file structure and file naming</summary>
+
 ### ✅ Setup Example:
 ```bash
 # 1. Create your analysis folder
@@ -104,6 +108,8 @@ simple-fork/
 - `root_mutant.mut.R1.fastq`, `root_mutant.mut.R2.fastq`, `root_mutant.wt.R1.fastq`, `root_mutant.wt.R2.fastq`
 - `sample_mut.R1.fq`, `sample_mut.R2.fq`, `sample_wt.R1.fq`, `sample_wt.R2.fq`
 
+</details>
+
 ### Step 2: Check Available Species
 Before configuring, check what species are available:
 
@@ -121,6 +127,9 @@ docker run --rm ghcr.io/andraghetti/simple cat /app/scripts/data_base.txt | grep
 - `caenorhabditis_elegans`
 - `danio_rerio`
 - `Saccharomyces_cerevisiae`
+
+This will be required in the next step, so copy the value. It will be used in the `--species` attribute.
+Example: `--species Drosophila_melanogaster`.
 
 ### Step 3: Configure the Analysis
 The pipeline accepts command line arguments that override the default values. You can customize the analysis by passing parameters to the Docker container:
