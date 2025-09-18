@@ -1,9 +1,5 @@
 .DS_Store
-/fastq/*
+/data/*
 /runs/*
-#/programs/**
-/refs/*
-!/refs/empty.vcf
-!/refs/empty.vcf.gz
 ~*
 .Rapp.history

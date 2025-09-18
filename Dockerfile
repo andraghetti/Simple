@@ -53,8 +53,11 @@ RUN R --slave -e "library(ggplot2); library(reshape2); cat('R packages loaded su
 # Set working directory
 WORKDIR /app
 
-# Copy all files (excluding output and fastq directories via .dockerignore)
+# Copy all files (excluding output and data directories via .dockerignore)
 COPY . /app/
+
+# Create runs directory for output
+RUN mkdir -p /app/runs /app/refs
 
 # Install BWA 0.7.19 (latest bug-fixed version) with architecture-specific optimizations
 RUN echo "Installing BWA 0.7.19..." && \
@@ -99,5 +102,5 @@ RUN echo "Setting up snpEff..." && \
 # Make scripts executable
 RUN chmod +x ./scripts/simple.sh
 
-# Default command
-CMD ["./scripts/simple.sh"]
+# Set entrypoint
+ENTRYPOINT ["./scripts/simple.sh"]

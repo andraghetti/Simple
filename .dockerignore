@@ -1,7 +1,6 @@
 # Exclude folders that would be mounted
-fastq/
+data/
 runs/
-refs/
 
 # Exclude git and system files
 .git/

@@ -2,45 +2,163 @@
 #pipeline for mapping EMS mutants
 #bug report to Lorenzo Andraghetti andraghetti.l@gmail.com
 
-#mapping w/ BWA
+# Function to display usage
+usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo "Options:"
+    echo "  -l, --line LINE_NAME        Line name (default: EMS)"
+    echo "  -x, --mutation TYPE         Mutation type: recessive or dominant (default: recessive)"
+    echo "  -s, --species SPECIES       Species name (default: Arabidopsis_thaliana)"
+    echo "  -c, --cpu-cores CORES       CPU cores: auto or number (default: auto)"
+    echo "  -m, --memory MEMORY         Memory allocation (default: auto)"
+    echo "  -h, --help                  Show this help message"
+    echo ""
+    echo "Example:"
+    echo "  $0 --line root_mutant --mutation recessive --species Arabidopsis_thaliana --cpu-cores auto --memory 16g"
+    exit 1
+}
+
+# Default values
+line="EMS"
+mutation="recessive"
+my_species="Arabidopsis_thaliana"
+cores="auto"
+memory="auto"
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -l|--line)
+            line="$2"
+            shift 2
+            ;;
+        -x|--mutation)
+            mutation="$2"
+            shift 2
+            ;;
+        -s|--species)
+            my_species="$2"
+            shift 2
+            ;;
+        -c|--cpu-cores)
+            cores="$2"
+            shift 2
+            ;;
+        -m|--memory)
+            memory="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            ;;
+        *)
+            echo "Unknown option: $1"
+            usage
+            ;;
+    esac
+done
+
+# Validate mutation type
+if [[ "$mutation" != "recessive" && "$mutation" != "dominant" ]]; then
+    echo "Error: mutation type must be 'recessive' or 'dominant'"
+    exit 1
+fi
+
+# Handle "auto" memory setting
+if [ "$memory" = "auto" ]; then
+    # Auto-detect maximum safe memory (leave 2GB for system)
+    total_mem_gb=$(free -g | awk '/^Mem:/{print $2}')
+    if [ "$total_mem_gb" -gt 4 ]; then
+        # Leave 2GB for system, use the rest
+        safe_mem=$((total_mem_gb - 2))
+        memory="${safe_mem}g"
+    else
+        # For systems with 4GB or less, use 2GB
+        memory="2g"
+    fi
+fi
+
+# Handle "auto" CPU cores setting
+if [ "$cores" = "auto" ]; then
+    # Auto-detect number of CPU cores
+    cores=$(nproc)
+fi
+
+# Set derived variables
+mut="${line}_mut"
+wt="${line}_wt"
+
+# Find input files with flexible naming patterns
+# Supports: mut.R1.fq.gz, mut.R1.fastq, mut.R1.fq, etc.
+# Also supports: line_mut.R1.fq.gz, line_mut.R1.fastq, etc.
+
 echo "=========================================="
 echo "STEP 0/8: SETTING UP RUN"
+echo "=========================================="
+echo "Configuration:"
+echo "  Line: $line"
+echo "  Mutation type: $mutation"
+echo "  Species: $my_species"
+echo "  CPU cores: $cores"
+echo "  Java memory: $memory"
 echo "=========================================="
 
 # Create timestamped run directory
 RUN_DIR="runs/run-$(date +%Y%m%d_%H%M%S)"
-mkdir -p "$RUN_DIR"/{output,refs,fastq,scripts}
+mkdir -p "$RUN_DIR"/{output,refs,data,scripts}
 
-# Copy input files to run directory
-cp -r fastq/* "$RUN_DIR/fastq/" 2>/dev/null || true
-
-# Copy pipeline scripts to run directory for reproducibility
 echo "Copying pipeline scripts to run directory for reproducibility..."
-cp /app/scripts/simple.sh "$RUN_DIR/scripts/"
-cp /app/scripts/simple_variables.sh "$RUN_DIR/scripts/"
-cp /app/scripts/data_base.txt "$RUN_DIR/scripts/"
-cp /app/scripts/analysis3.R "$RUN_DIR/scripts/"
+cp scripts/simple.sh "$RUN_DIR/scripts/"
+cp scripts/data_base.txt "$RUN_DIR/scripts/"
+cp scripts/analysis3.R "$RUN_DIR/scripts/"
 echo "Scripts copied to $RUN_DIR/scripts/"
+echo "Copying input files to run directory..."
+cp data/* "$RUN_DIR/data/"
+echo "Input files copied to $RUN_DIR/data/"
+
 
 # Change to run directory for all operations
 cd "$RUN_DIR"
 
-{ # the entire script stdout and error will be displayed and redirected to log.txt
-#reading variables
-source ./scripts/simple_variables.sh
+# Search for input files in the copied data directory
+echo "Searching for input files..."
+mut_files=()
+wt_files=()
 
-# Set Java memory allocation from configuration
-JAVA_MEMORY=$java_memory
-echo "Using Java memory allocation: $JAVA_MEMORY"
+# Look for mutant files (must contain "mut" and "R1" or "R2")
+for file in data/*mut*R1* data/*mut*R2*; do
+    if [ -f "$file" ]; then
+        mut_files+=("$file")
+        echo "Found mutant file: $file"
+    fi
+done
 
-# Set CPU cores - auto-detect if set to "auto"
-if [ "$cpu_cores" = "auto" ]; then
-    CPU_CORES=$(nproc)
-    echo "Auto-detected CPU cores: $CPU_CORES"
-else
-    CPU_CORES=$cpu_cores
-    echo "Using specified CPU cores: $CPU_CORES"
+# Look for wild-type files (must contain "wt" and "R1" or "R2")
+for file in data/*wt*R1* data/*wt*R2*; do
+    if [ -f "$file" ]; then
+        wt_files+=("$file")
+        echo "Found wild-type file: $file"
+    fi
+done
+
+# Validate that we found files
+if [ ${#mut_files[@]} -eq 0 ]; then
+    echo "ERROR: No mutant files found!"
+    echo "Expected files containing 'mut' and 'R1' or 'R2' in data/ directory"
+    echo "Examples: data/mut.R1.fq.gz, data/mut.R1.fastq, data/line_mut.R1.fq.gz"
+    exit 1
 fi
+
+if [ ${#wt_files[@]} -eq 0 ]; then
+    echo "ERROR: No wild-type files found!"
+    echo "Expected files containing 'wt' and 'R1' or 'R2' in data/ directory"
+    echo "Examples: data/wt.R1.fq.gz, data/wt.R1.fastq, data/line_wt.R1.fq.gz"
+    exit 1
+fi
+
+echo "Found ${#mut_files[@]} mutant files and ${#wt_files[@]} wild-type files"
+
+{ # the entire script stdout and error will be displayed and redirected to log.txt
 
 # Check for BWA - should be installed system-wide
 if ! command -v bwa &> /dev/null; then
@@ -101,7 +219,7 @@ bwa index -p $my_species.chrs.fa -a is $fa
 mv $my_species.chrs.* refs/
 
 echo "Generating dict file for GATK"
-$java -Xmx$JAVA_MEMORY -jar /usr/local/bin/picard.jar CreateSequenceDictionary -R $fa -O refs/$my_species.chrs.dict
+java -Xmx$memory -jar /usr/local/bin/picard.jar CreateSequenceDictionary -R $fa -O refs/$my_species.chrs.dict
 
 
 #making sure that all ref files where loaded and/or created; this is a good control and if the output is "something went wrong", it is usually picard failing due to a problem with java
@@ -122,25 +240,25 @@ echo "=========================================="
 echo "STEP 1/8: BWA MAPPING"
 echo "=========================================="
 echo "This step maps reads to the reference genome..."
-echo "Running BWA mapping with $CPU_CORES cores..."
-bwa mem -t $CPU_CORES -M $fa ${mut_files[*]} > output/$mut.sam &
-bwa mem -t $CPU_CORES -M $fa ${wt_files[*]} > output/$wt.sam
+echo "Running BWA mapping with $cores cores..."
+bwa mem -t $cores -M $fa ${mut_files[*]} > output/$mut.sam &
+bwa mem -t $cores -M $fa ${wt_files[*]} > output/$wt.sam
 wait
 echo "BWA mapping completed!"
 
 
 #due to old samtools version this step is probably necessary
 echo "Converting SAM to BAM format..."
-samtools view -@ $CPU_CORES -bSh output/$mut.sam > output/$mut.bam &
-samtools view -@ $CPU_CORES -bSh output/$wt.sam > output/$wt.bam
+samtools view -@ $cores -bSh output/$mut.sam > output/$mut.bam &
+samtools view -@ $cores -bSh output/$wt.sam > output/$wt.bam
 wait
 
 rm -r output/*.sam
 
 #this step is probably needed only when you have paired-end; in any case it should come before coordinate sorting (next step) on name-sorted files
 echo "Fixing mate information..."
-samtools fixmate -@ $CPU_CORES output/$mut.bam output/$mut.fix.bam &
-samtools fixmate -@ $CPU_CORES output/$wt.bam output/$wt.fix.bam
+samtools fixmate -@ $cores output/$mut.bam output/$mut.fix.bam &
+samtools fixmate -@ $cores output/$wt.bam output/$wt.fix.bam
 wait
 
 #sort by coordinates
@@ -149,8 +267,8 @@ echo "STEP 2/8: SORTING BAM FILES"
 echo "=========================================="
 echo "This step sorts the BAM files by genomic coordinates..."
 echo "Sorting BAM files..."
-samtools sort -@ $CPU_CORES -o output/$mut.sort.bam output/$mut.fix.bam &
-samtools sort -@ $CPU_CORES -o output/$wt.sort.bam output/$wt.fix.bam
+samtools sort -@ $cores -o output/$mut.sort.bam output/$mut.fix.bam &
+samtools sort -@ $cores -o output/$wt.sort.bam output/$wt.fix.bam
 wait
 echo "BAM sorting completed!"
 
@@ -170,8 +288,8 @@ echo "=========================================="
 echo "This step identifies and marks PCR duplicates..."
 echo "WARNING: This step can take a long time for large datasets!"
 echo "Running MarkDuplicates for both samples..."
-$java -Xmx$JAVA_MEMORY -jar /usr/local/bin/picard.jar MarkDuplicates I=output/$mut.sort.bam O=output/$mut.sort.md.bam METRICS_FILE=output/$mut.matrics.txt ASSUME_SORTED=true &
-$java -Xmx$JAVA_MEMORY -jar /usr/local/bin/picard.jar MarkDuplicates I=output/$wt.sort.bam O=output/$wt.sort.md.bam METRICS_FILE=output/$wt.matrics.txt ASSUME_SORTED=true
+java -Xmx$memory -jar /usr/local/bin/picard.jar MarkDuplicates I=output/$mut.sort.bam O=output/$mut.sort.md.bam METRICS_FILE=output/$mut.matrics.txt ASSUME_SORTED=true &
+java -Xmx$memory -jar /usr/local/bin/picard.jar MarkDuplicates I=output/$wt.sort.bam O=output/$wt.sort.md.bam METRICS_FILE=output/$wt.matrics.txt ASSUME_SORTED=true
 wait
 
 # Check if MarkDuplicates completed successfully
@@ -186,12 +304,12 @@ fi
 echo "MarkDuplicates completed successfully for both samples."
 
 #this part is just to add header for further gatk tools
-$java -Xmx$JAVA_MEMORY -jar /usr/local/bin/picard.jar AddOrReplaceReadGroups I=output/$mut.sort.md.bam O=output/$mut.sort.md.rg.bam RGLB=$mut RGPL=illumina RGSM=$mut RGPU=run1 SORT_ORDER=coordinate &
-$java -Xmx$JAVA_MEMORY -jar /usr/local/bin/picard.jar AddOrReplaceReadGroups I=output/$wt.sort.md.bam O=output/$wt.sort.md.rg.bam RGLB=$wt RGPL=illumina RGSM=$wt RGPU=run1 SORT_ORDER=coordinate
+java -Xmx$memory -jar /usr/local/bin/picard.jar AddOrReplaceReadGroups I=output/$mut.sort.md.bam O=output/$mut.sort.md.rg.bam RGLB=$mut RGPL=illumina RGSM=$mut RGPU=run1 SORT_ORDER=coordinate &
+java -Xmx$memory -jar /usr/local/bin/picard.jar AddOrReplaceReadGroups I=output/$wt.sort.md.bam O=output/$wt.sort.md.rg.bam RGLB=$wt RGPL=illumina RGSM=$wt RGPU=run1 SORT_ORDER=coordinate
 wait
 
-$java -Xmx$JAVA_MEMORY -jar /usr/local/bin/picard.jar BuildBamIndex INPUT=output/$mut.sort.md.rg.bam OUTPUT=output/$mut.sort.md.rg.bai &
-$java -Xmx$JAVA_MEMORY -jar /usr/local/bin/picard.jar BuildBamIndex INPUT=output/$wt.sort.md.rg.bam OUTPUT=output/$wt.sort.md.rg.bai
+java -Xmx$memory -jar /usr/local/bin/picard.jar BuildBamIndex INPUT=output/$mut.sort.md.rg.bam OUTPUT=output/$mut.sort.md.rg.bai &
+java -Xmx$memory -jar /usr/local/bin/picard.jar BuildBamIndex INPUT=output/$wt.sort.md.rg.bam OUTPUT=output/$wt.sort.md.rg.bai
 wait
 
 
@@ -201,8 +319,8 @@ echo "STEP 5/8: VARIANT CALLING (GATK HaplotypeCaller)"
 echo "=========================================="
 echo "This step identifies genetic variants..."
 echo "WARNING: This step can take a very long time (30+ minutes)!"
-echo "Running GATK HaplotypeCaller with $CPU_CORES cores..."
-$java -Xmx$JAVA_MEMORY -jar /usr/local/bin/GenomeAnalysisTK.jar -T HaplotypeCaller -R $fa -I output/$mut.sort.md.rg.bam -I output/$wt.sort.md.rg.bam -o output/$line.hc.vcf -minReadsPerAlignStart 7 -gt_mode DISCOVERY -out_mode EMIT_ALL_SITES -writeFullFormat -stand_call_conf 10 -nct $CPU_CORES -variant_index_type LINEAR -variant_index_parameter 128000 -allowPotentiallyMisencodedQuals
+echo "Running GATK HaplotypeCaller with $cores cores..."
+java -Xmx$memory -jar /usr/local/bin/GenomeAnalysisTK.jar -T HaplotypeCaller -R $fa -I output/$mut.sort.md.rg.bam -I output/$wt.sort.md.rg.bam -o output/$line.hc.vcf -minReadsPerAlignStart 7 -gt_mode DISCOVERY -out_mode EMIT_ALL_SITES -writeFullFormat -stand_call_conf 10 -nct $cores -variant_index_type LINEAR -variant_index_parameter 128000 -allowPotentiallyMisencodedQuals
 
 # Check if HaplotypeCaller completed successfully
 if [ ! -f output/$line.hc.vcf ]; then
@@ -213,10 +331,10 @@ echo "GATK HaplotypeCaller completed successfully."
 
 ############preparing for R#########################
 #Exclude indels from a VCF
-#$java -Xmx2g -jar /usr/local/bin/GenomeAnalysisTK.jar -R $fa -T SelectVariants --variant output/$line.hc.vcf -o output/$line.selvars.vcf --selectTypeToInclude SNP
+java -Xmx2g -jar /usr/local/bin/GenomeAnalysisTK.jar -R $fa -T SelectVariants --variant output/$line.hc.vcf -o output/$line.selvars.vcf --selectTypeToInclude SNP
 
 echo "Converting VCF to table..."
-$java -Xmx$JAVA_MEMORY -jar /usr/local/bin/GenomeAnalysisTK.jar -R $fa -T VariantsToTable -V output/$line.hc.vcf -F CHROM -F POS -F REF -F ALT -GF GT -GF AD -GF DP -GF GQ -o output/$line.table
+java -Xmx$memory -jar /usr/local/bin/GenomeAnalysisTK.jar -R $fa -T VariantsToTable -V output/$line.hc.vcf -F CHROM -F POS -F REF -F ALT -GF GT -GF AD -GF DP -GF GQ -o output/$line.table
 
 
 ####################################################################################################################################################
@@ -229,7 +347,7 @@ echo "=========================================="
 echo "This step annotates variants with functional information..."
 echo "WARNING: This step can take a long time (10+ minutes)!"
 echo "Running snpEff annotation..."
-$java -Xmx$JAVA_MEMORY -jar /usr/local/bin/snpEff.jar -c /usr/local/snpEff/snpEff.config -v $my_species output/$line.hc.vcf > output/$line.se.vcf 2> output/snpEff_error.log
+java -Xmx$memory -jar /usr/local/bin/snpEff.jar -c /usr/local/snpEff/snpEff.config -v $my_species output/$line.hc.vcf > output/$line.se.vcf 2> output/snpEff_error.log
 
 # Check if snpEff succeeded
 if [ ! -f "output/$line.se.vcf" ] || [ ! -s "output/$line.se.vcf" ]; then
@@ -239,6 +357,15 @@ if [ ! -f "output/$line.se.vcf" ] || [ ! -s "output/$line.se.vcf" ]; then
     cp output/$line.hc.vcf output/$line.se.vcf
 else
     echo "snpEff completed successfully!"
+fi
+
+# Move snpEff summary files to output directory
+echo "Organizing snpEff output files..."
+if [ -f "snpEff_genes.txt" ]; then
+    mv snpEff_genes.txt output/
+fi
+if [ -f "snpEff_summary.html" ]; then
+    mv snpEff_summary.html output/
 fi
 
 ###%%%%%%% JEN %%%%%%%%%%
@@ -336,17 +463,8 @@ echo "PIPELINE COMPLETED SUCCESSFULLY!"
 echo "=========================================="
 echo "All 8 steps completed successfully!"
 echo "Results are available in the output directory."
-echo "CPU cores used: $CPU_CORES"
-echo "Java memory allocated: $JAVA_MEMORY"
-echo "=========================================="
 echo "Results saved in run directory: $(pwd)"
 echo "Final results in: $(pwd)/output/"
-echo "Performance: Used $CPU_CORES CPU cores for maximum speed"
-echo "Memory: Allocated $JAVA_MEMORY RAM for Java tools"
 echo "=========================================="
 
-} 2>&1 | tee ./output/log.txt #with the { at the beginning of the text will redirect all console output to a file and still be visible in the terminal 
-
-
-
-
+} 2>&1 | tee ./output/log.txt # this will redirect all console output to a file and still be visible in the terminal
